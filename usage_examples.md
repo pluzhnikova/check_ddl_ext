@@ -17,7 +17,7 @@
 
 ### Решение
 ```sql
-DROP TABLE IF EXISTS employees;
+-- DROP TABLE IF EXISTS employees;
 CREATE TABLE employees (
     emp_id SERIAL PRIMARY KEY,
     emp_name VARCHAR(100),
@@ -46,9 +46,12 @@ SELECT check_table_structure(
 + 0.5 балла, если содержимое представления верное
 Если представления не существует, сразу возвращается 0. 
 ### Задание
-Создать представление `max_salary_position`, отображающее максимальную зарплату по каждой позиции из таблицы `employees`. В первой колонке - `position` - должно быть указано название позиции, во второй – `max_salary` - максимальная зарплата среди сотрудников этой позиции.
+Есть таблица `employees`, содержащая информацию о сотрудниках, с полями - `emp_id` (ID сотрудника) типа `SERIAL`,`emp_name` (имя сотрудника) типа `VARCHAR(100)`, `position` (должность) типа `VARCHAR(50)` и `salary` (размер зарплаты) типа `DECIMAL(10, 2)`.
+
+Создайте представление `max_salary_position`, отображающее максимальную зарплату по каждой позиции из таблицы `employees`. В первой колонке - `position` - должно быть указано название позиции, во второй – `max_salary` - максимальная зарплата среди сотрудников этой позиции.
 ### Решение
 ```sql
+/*
 DROP TABLE IF EXISTS employees CASCADE;
 CREATE TABLE employees (
 	emp_id SERIAL PRIMARY KEY,
@@ -63,7 +66,7 @@ INSERT INTO employees (emp_name, position, salary) VALUES
 ('David', 'Manager', 11000.00),
 ('Eve', 'Developer', 8500.00);
 DROP VIEW IF EXISTS max_salary_position;
-
+*/
 CREATE VIEW max_salary_position AS
 SELECT
     position,
@@ -99,9 +102,12 @@ SELECT check_view(
 Если мат. представления не существует, сразу возвращается 0. 
 
 ### Задание
-Создать материализованное представление max_salary_position, отображающее максимальную зарплату по каждой позиции из таблицы employees. В первой колонке - position - должно быть указано название позиции, во второй – max_salary - максимальная зарплата среди сотрудников этой позиции.
+Есть таблица `employees`, содержащая информацию о сотрудниках, с полями - `emp_id` (ID сотрудника) типа `SERIAL`,`emp_name` (имя сотрудника) типа `VARCHAR(100)`, `position` (должность) типа `VARCHAR(50)` и `salary` (размер зарплаты) типа `DECIMAL(10, 2)`.
+
+Создайте материализованное представление `max_salary_position`, отображающее максимальную зарплату по каждой позиции из таблицы `employees`. В первой колонке - `position` - должно быть указано название позиции, во второй – `max_salary` - максимальная зарплата среди сотрудников этой позиции.
 ### Решение
 ```sql
+/*
 DROP TABLE IF EXISTS employees CASCADE;
 CREATE TABLE employees (
 	emp_id SERIAL PRIMARY KEY,
@@ -116,7 +122,7 @@ INSERT INTO employees (emp_name, position, salary) VALUES
 ('David', 'Manager', 11000.00),
 ('Eve', 'Developer', 8500.00);
 DROP MATERIALIZED VIEW IF EXISTS max_salary_position;
-
+*/
 CREATE MATERIALIZED VIEW max_salary_position AS
 SELECT 
     position, 
@@ -145,9 +151,12 @@ SELECT check_materialized_view(
 Функция вернёт:
 по 1/n балла за каждое правильное ограничение, где n - кол-во ограничений
 ### Задание
-Проставьте такие ограничения таблицы employees, чтобы поле emp_id стало первичным ключом, поле emp_name не могло содержать пустых записей, а значения поля salary не превышали 500000.
+Есть таблица `employees`, содержащая информацию о сотрудниках, с полями - `emp_id` (ID сотрудника) типа `SERIAL`,`emp_name` (имя сотрудника) типа `VARCHAR(100)`, `position` (должность) типа `VARCHAR(50)` и `salary` (размер зарплаты) типа `DECIMAL(10, 2)`.
+
+Проставьте такие ограничения таблицы `employees`, чтобы поле `emp_id` стало первичным ключом, поле `emp_name` не могло содержать пустых записей, а значения поля `salary` не превышали 500 000.
 ### Решение
 ```sql
+/*
 DROP TABLE IF EXISTS employees CASCADE;
 CREATE TABLE employees (
 	emp_id SERIAL,
@@ -155,6 +164,7 @@ CREATE TABLE employees (
 	position VARCHAR(50),
 	salary DECIMAL(10, 2)
 );
+*/
 ALTER TABLE employees
 ADD CONSTRAINT pk_emp_id PRIMARY KEY (emp_id);
 
@@ -185,10 +195,10 @@ SELECT check_constraints(
 Если последовательности не существует, сразу возвращается 0. 
 
 ### Задание
-Создайте последовательность test_sequence, которая начинается с 10 и возрастает с шагом 5. 
+Создайте последовательность `test_sequence`, которая начинается с 10 и возрастает с шагом 5. 
 ### Решение
 ```sql
-DROP SEQUENCE IF EXISTS test_sequence;
+-- DROP SEQUENCE IF EXISTS test_sequence;
 CREATE SEQUENCE test_sequence
     START WITH 10
     INCREMENT BY 5;
@@ -212,9 +222,11 @@ SELECT check_sequence(
 Если подходящий триггер не нашёлся, сразу возвращается 0.
 
 ### Задание
-Создайте триггер check_update,  который срабатывает перед обновлением таблицы employees и запускает функцию f_updated_emp() для каждой обновлённой записи.
+Есть таблица `employees`, содержащая информацию о сотрудниках, и функция `f_updated_emp()`, которая возвращает информацию о добавленоом сотруднике.
+Создайте триггер `check_update`,  который срабатывает перед обновлением таблицы `employees` и запускает функцию `f_updated_emp()` для каждой обновлённой записи.
 ### Решение
 ```sql
+/*
 DROP TABLE IF EXISTS employees CASADE;
 CREATE TABLE employees (
 	emp_id SERIAL PRIMARY KEY,
@@ -228,6 +240,7 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+*/
 CREATE TRIGGER check_update
 BEFORE UPDATE ON employees
 FOR EACH ROW
@@ -248,9 +261,11 @@ SELECT check_trigger(
 1 балл за верное решение
 0 баллов, если индекс не найден 
 ### Задание
-Создайте индекс на столбце emp_name в таблице employees.
+Есть таблица `employees`, содержащая информацию о сотрудниках, с полем `emp_name` (имя сотрудника).
+Создайте индекс на столбце `emp_name` в таблице `employees`.
 ### Решение
 ```sql
+/*
 DROP TABLE IF EXISTS employees;
 CREATE TABLE employees (
 	emp_id SERIAL PRIMARY KEY,
@@ -259,6 +274,7 @@ CREATE TABLE employees (
 	salary DECIMAL(10, 2)
 );
 DROP INDEX IF EXISTS idx_emp_name;
+*/
 CREATE INDEX idx_emp_name ON employees (emp_name);
 ```
 ### Запуск функции
