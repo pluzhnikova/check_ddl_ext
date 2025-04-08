@@ -1,0 +1,5 @@
+# check_ddl_ext.control
+comment = 'Extention_to_check_ddl_queries'
+default_version = '1.0'
+module_pathname = '$libdir/check_ddl_ext'
+relocatable = true
