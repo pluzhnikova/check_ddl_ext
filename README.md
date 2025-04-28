@@ -1,8 +1,9 @@
 # check_ddl_ext
 Расширение PostgreSQL для проверки DDL запросов
 
-# Подготовка к работе с функциями
-После клонирования репозитория скопируйте файлы расширений в ваш каталог расширений PostgreSQL:
+## Подготовка к работе с функциями 
+### Для Linux/macOS
+После клонирования репозитория скопируйте `.sql` и `.control` в ваш каталог расширений PostgreSQL:
 ```
 sudo cp check_ddl_ext* $(pg_config --sharedir)/extension/
 ```
@@ -12,6 +13,15 @@ sudo cp check_ddl_ext* $(pg_config --sharedir)/extension/
 sudo cp check_ddl_ext* /usr/share/postgresql/<version>/extension/
 ```
 
+Далее выполните запрос для загрузки функций:
+```
+CREATE EXTENSION check_ddl_ext;
+```
+### Для Windows
+Скопируйте `.sql` и `.control` файлы в ваш каталог расширений PostgreSQL:
+```
+C:\Program Files\PostgreSQL\<version>\share\extension\
+```
 Далее выполните запрос для загрузки функций:
 ```
 CREATE EXTENSION check_ddl_ext;
@@ -27,13 +37,14 @@ CREATE EXTENSION check_ddl_ext;
 - check_index(student_schema, teacher_schema, sql_query)
 
 ## Примеры использования
-В файле usage_examples.md вы найдёте типовые примеры зданий для использования функций.
+В файле usage_examples.md вы найдёте описание функций и типовые примеры заданий, для которых эти функции используются.
 
 # check_ddl_ext
 PostgreSQL extension for ddl-queries validation
 
-# Getting started
-After cloning repo, copy extension files to your PostgreSQL extension directory:
+## Getting started
+### Linux/macOS
+After cloning repo, copy `.sql` and `.control` files to your PostgreSQL extension directory:
 ```
 sudo cp check_ddl_ext* $(pg_config --sharedir)/extension/
 ```
@@ -43,6 +54,15 @@ Or if you want to specify the PostgreSQL version manually:
 sudo cp check_ddl_ext* /usr/share/postgresql/<version>/extension/
 ```
 
+In psql, proceed with the classic approach:
+```
+CREATE EXTENSION check_ddl_ext;
+```
+### Windows
+Copy `.sql` and `.control` files to your PostgreSQL extension directory:
+```
+C:\Program Files\PostgreSQL\<version>\share\extension\
+```
 In psql, proceed with the classic approach:
 ```
 CREATE EXTENSION check_ddl_ext;
