@@ -139,18 +139,15 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION check_view(
     student_schema TEXT,
-   teacher_schema TEXT,
+    teacher_schema TEXT,
     expected_view_sql TEXT
 ) RETURNS NUMERIC AS $$
 DECLARE
     view_name TEXT;
-    view_exists BOOLEAN;
     teacher_data JSONB;
     student_data JSONB;
     teacher_view_oid OID;
     student_view_oid OID;
-    structure_match BOOLEAN := TRUE;
-    data_match BOOLEAN;
     required_columns TEXT[];
     missing_column TEXT;
     column_exists BOOLEAN;
@@ -159,7 +156,7 @@ BEGIN
     -- Извлекаем имя представления из SQL-запроса
     view_name := (regexp_matches(expected_view_sql, 'CREATE VIEW\s+([^\s(]+)', 'i'))[1];
        
-    -- Удаляем старое эталонное представление
+    -- Удаляем старое эталонное представление 
     EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
     
     -- Создаем эталонное представление
@@ -194,17 +191,7 @@ BEGIN
     INTO student_view_oid;
     
     -- Проверяем существование представления у студента
-    EXECUTE format('
-        SELECT EXISTS (
-            SELECT 1
-            FROM pg_views
-            WHERE schemaname = %L
-            AND viewname = %L
-        )', student_schema, view_name)
-    INTO view_exists;
-    
-    IF NOT view_exists OR student_view_oid IS NULL THEN
-        EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
+    IF student_view_oid IS NULL THEN
         RETURN 0.0;
     END IF;
 
@@ -233,7 +220,6 @@ BEGIN
         INTO column_exists;
         
         IF column_exists THEN
-            EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
             RETURN 0.3;
         END IF;
     END LOOP;
@@ -270,55 +256,41 @@ BEGIN
     INTO type_mismatch;
     
     IF type_mismatch THEN
-        EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
         RETURN 0.3;
     END IF;
     
     -- Проверка данных (только по обязательным столбцам)
     BEGIN
-        -- Получаем данные из представления учителя
         EXECUTE format('
             SELECT jsonb_agg(row_to_json(t))
             FROM (SELECT %s FROM %I.%I ORDER BY 1) t', 
             array_to_string(required_columns, ', '), teacher_schema, view_name)
         INTO teacher_data;
         
-        -- Получаем данные из представления студента
         EXECUTE format('
             SELECT jsonb_agg(row_to_json(t))
             FROM (SELECT %s FROM %I.%I ORDER BY 1) t', 
             array_to_string(required_columns, ', '), student_schema, view_name)
         INTO student_data;
         
-        -- Сравниваем данные
-        data_match := (teacher_data::TEXT = student_data::TEXT);
-        
-        IF NOT data_match THEN
-            EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
+        IF teacher_data::TEXT <> student_data::TEXT THEN
             RETURN 0.7;
         END IF;
     EXCEPTION WHEN OTHERS THEN
-        EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
         RETURN 0.3;
     END;
     
-    -- Удаляем временное эталонное представление
-    EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
-    
-    -- Все проверки пройдены успешно
     RETURN 1.0;
 END;
 $$ LANGUAGE plpgsql;
 
-
 CREATE OR REPLACE FUNCTION check_materialized_view(
     student_schema TEXT,
-teacher_schema TEXT,
+    teacher_schema TEXT,
     expected_view_sql TEXT
 ) RETURNS NUMERIC AS $$
 DECLARE
     view_name TEXT;
-    view_exists BOOLEAN;
     teacher_data JSONB;
     student_data JSONB;
     teacher_view_oid OID;
@@ -331,10 +303,7 @@ BEGIN
     -- Извлекаем имя представления из SQL-запроса
     view_name := (regexp_matches(expected_view_sql, 'CREATE MATERIALIZED VIEW\s+([^\s(]+)', 'i'))[1];
     
-    -- Создаем временную схему для проверки
-    EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I', teacher_schema);
-    
-    -- Удаляем старое эталонное представление
+    -- Удаляем старое эталонное представление 
     EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
     
     -- Создаем эталонное представление
@@ -369,17 +338,7 @@ BEGIN
     INTO student_view_oid;
     
     -- Проверяем существование представления у студента
-    EXECUTE format('
-        SELECT EXISTS (
-            SELECT 1
-            FROM pg_matviews
-            WHERE schemaname = %L
-            AND matviewname = %L
-        )', student_schema, view_name)
-    INTO view_exists;
-    
-    IF NOT view_exists OR student_view_oid IS NULL THEN
-        EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
+    IF student_view_oid IS NULL THEN
         RETURN 0.0;
     END IF;
 
@@ -408,7 +367,6 @@ BEGIN
         INTO column_exists;
         
         IF column_exists THEN
-            EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
             RETURN 0.3;
         END IF;
     END LOOP;
@@ -445,44 +403,33 @@ BEGIN
     INTO type_mismatch;
     
     IF type_mismatch THEN
-        EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
         RETURN 0.3;
     END IF;
     
     -- Проверка данных (только по обязательным столбцам)
     BEGIN
-        -- Получаем данные из представления учителя
         EXECUTE format('
             SELECT jsonb_agg(row_to_json(t))
             FROM (SELECT %s FROM %I.%I ORDER BY 1) t', 
             array_to_string(required_columns, ', '), teacher_schema, view_name)
         INTO teacher_data;
         
-        -- Получаем данные из представления студента
         EXECUTE format('
             SELECT jsonb_agg(row_to_json(t))
             FROM (SELECT %s FROM %I.%I ORDER BY 1) t', 
             array_to_string(required_columns, ', '), student_schema, view_name)
         INTO student_data;
         
-        -- Сравниваем данные
         IF teacher_data::TEXT <> student_data::TEXT THEN
-            EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
             RETURN 0.7;
         END IF;
     EXCEPTION WHEN OTHERS THEN
-        EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
         RETURN 0.3;
     END;
     
-    -- Удаляем временное эталонное представление
-    EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
-    
-    -- Все проверки пройдены успешно
     RETURN 1.0;
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION check_constraints(
     student_schema TEXT,
@@ -504,7 +451,7 @@ DECLARE
     nn_count INT := 0;
     nn_total INT := 0;
 BEGIN
-    -- Извлекаем имя таблицы из SQL (первое упоминание после ALTER TABLE)
+    -- Извлекаем имя таблицы 
     table_name := (regexp_matches(constraints_sql, 'ALTER TABLE\s+([^\s;]+)', 'i'))[1];
     
     -- Проверяем существование таблицы в схеме учителя
@@ -515,26 +462,23 @@ BEGIN
         RAISE EXCEPTION 'Таблица %.% не существует', teacher_schema, table_name;
     END IF;
     
-    -- Получаем OID таблиц с указанием схемы
+    -- Получаем OID таблиц
     EXECUTE format('SELECT ''%I.%I''::regclass', teacher_schema, table_name) INTO teacher_table_oid;
     EXECUTE format('SELECT ''%I.%I''::regclass', student_schema, table_name) INTO student_table_oid;
-    
-    -- Разбиваем SQL на отдельные команды
+   
     constraint_lines := regexp_split_to_array(constraints_sql, E';\n?');
     
-    -- Применяем ограничения в схеме учителя (игнорируем ошибки существующих ограничений)
+    -- Применяем ограничения в схеме учителя (ошибки игнорируются)
     EXECUTE format('SET search_path TO %I', teacher_schema);
     
     FOREACH line IN ARRAY constraint_lines LOOP
         line := trim(line);
         CONTINUE WHEN line = '';
         
-        -- Пытаемся выполнить команду (игнорируем ошибки существующих ограничений)
         BEGIN
             EXECUTE line;
         EXCEPTION 
             WHEN duplicate_object THEN 
-                -- Ограничение уже существует - пропускаем ошибку
                 RAISE NOTICE 'Ограничение уже существует: %', line;
             WHEN OTHERS THEN
                 RAISE NOTICE 'Не удалось применить ограничение: %', SQLERRM;
@@ -618,8 +562,6 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
-
-
 CREATE OR REPLACE FUNCTION check_sequence(
     student_schema TEXT,
     teacher_schema TEXT,
@@ -628,43 +570,62 @@ CREATE OR REPLACE FUNCTION check_sequence(
 DECLARE
     sequence_name TEXT;
     sequence_exists BOOLEAN;
-    teacher_params JSONB;
+    teacher_params JSONB := '{}'::JSONB;
     student_params JSONB;
     param TEXT;
-    score NUMERIC := 1.0;
     total_params INT := 0;
     matched_params INT := 0;
+    param_value TEXT;
 BEGIN
     -- Извлекаем имя последовательности
     sequence_name := (regexp_matches(sequence_sql, 'CREATE SEQUENCE\s+([^\s(;]+)', 'i'))[1];
+    EXECUTE format('DROP SEQUENCE IF EXISTS %I.%I', teacher_schema, sequence_name);
     
-    -- Выполняем запрос создания последовательности в схеме учителя
     BEGIN
         EXECUTE format('SET search_path TO %I', teacher_schema);
         EXECUTE sequence_sql;
         EXECUTE format('SET search_path TO %I,public', current_schema());
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Error creating sequence in teacher schema: %', SQLERRM;
-        RETURN 0.0;
     END;
     
-    -- Получаем параметры последовательности учителя
-    EXECUTE format('
-        SELECT jsonb_build_object(
-            ''start_value'', s.seqstart,
-            ''increment_by'', s.seqincrement,
-            ''min_value'', s.seqmin,
-            ''max_value'', s.seqmax,
-            ''cycle'', s.seqcycle,
-            ''cache_size'', s.seqcache
-        )
-        FROM pg_class c
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        JOIN pg_sequence s ON c.oid = s.seqrelid
-        WHERE n.nspname = %L
-        AND c.relname = %L', 
-        teacher_schema, sequence_name)
-    INTO teacher_params;
+    -- Парсим параметры из запроса учителя 
+    -- START WITH
+    IF sequence_sql ~* 'START WITH\s+(\d+)' THEN
+        param_value := (regexp_matches(sequence_sql, 'START WITH\s+(\d+)', 'i'))[1];
+        teacher_params := teacher_params || jsonb_build_object('start_value', param_value::bigint);
+    END IF;
+    
+    -- INCREMENT BY
+    IF sequence_sql ~* 'INCREMENT BY\s+(\d+)' THEN
+        param_value := (regexp_matches(sequence_sql, 'INCREMENT BY\s+(\d+)', 'i'))[1];
+        teacher_params := teacher_params || jsonb_build_object('increment_by', param_value::bigint);
+    END IF;
+    
+    -- MINVALUE
+    IF sequence_sql ~* 'MINVALUE\s+(\d+)' THEN
+        param_value := (regexp_matches(sequence_sql, 'MINVALUE\s+(\d+)', 'i'))[1];
+        teacher_params := teacher_params || jsonb_build_object('min_value', param_value::bigint);
+    END IF;
+    
+    -- MAXVALUE
+    IF sequence_sql ~* 'MAXVALUE\s+(\d+)' THEN
+        param_value := (regexp_matches(sequence_sql, 'MAXVALUE\s+(\d+)', 'i'))[1];
+        teacher_params := teacher_params || jsonb_build_object('max_value', param_value::bigint);
+    END IF;
+    
+    -- CYCLE / NO CYCLE
+    IF sequence_sql ~* 'CYCLE' THEN
+        teacher_params := teacher_params || jsonb_build_object('cycle', true);
+    ELSIF sequence_sql ~* 'NO CYCLE' THEN
+        teacher_params := teacher_params || jsonb_build_object('cycle', false);
+    END IF;
+    
+    -- CACHE
+    IF sequence_sql ~* 'CACHE\s+(\d+)' THEN
+        param_value := (regexp_matches(sequence_sql, 'CACHE\s+(\d+)', 'i'))[1];
+        teacher_params := teacher_params || jsonb_build_object('cache_size', param_value::bigint);
+    END IF;
     
     -- Проверяем существование последовательности у студента
     EXECUTE format('
@@ -679,9 +640,7 @@ BEGIN
         )', student_schema, sequence_name)
     INTO sequence_exists;
     
-    IF NOT sequence_exists THEN
-        -- Удаляем последовательность учителя перед выходом
-        EXECUTE format('DROP SEQUENCE IF EXISTS %I.%I', teacher_schema, sequence_name);
+    IF NOT sequence_exists THEN 
         RETURN 0.0;
     END IF;
     
@@ -703,46 +662,34 @@ BEGIN
         student_schema, sequence_name)
     INTO student_params;
     
-    -- Подсчитываем общее количество параметров для проверки (не NULL в teacher_params)
+    -- Проверяем только те параметры, которые были указаны в запросе учителя
+    SELECT COUNT(*) INTO total_params 
+    FROM jsonb_object_keys(teacher_params);
+    
     FOR param IN SELECT jsonb_object_keys(teacher_params) LOOP
-        IF teacher_params->param IS NOT NULL THEN
-            total_params := total_params + 1;
+        IF student_params->>param IS NOT NULL AND 
+           student_params->>param = teacher_params->>param THEN
+            matched_params := matched_params + 1;
         END IF;
     END LOOP;
     
-    -- Проверяем параметры
-    FOR param IN SELECT jsonb_object_keys(teacher_params) LOOP
-        IF teacher_params->param IS NOT NULL THEN
-            IF student_params->>param IS NULL OR 
-               student_params->>param <> teacher_params->>param THEN
-                score := 0.5; -- Частичное совпадение
-            ELSE
-                matched_params := matched_params + 1;
-            END IF;
-        END IF;
-    END LOOP;
-    
-    -- Удаляем последовательность учителя
-    EXECUTE format('DROP SEQUENCE IF EXISTS %I.%I', teacher_schema, sequence_name);
-    
-    -- Если все параметры совпали - полное совпадение
-    IF matched_params = total_params AND total_params > 0 THEN
-        RETURN 1.0;
+    -- Возвращаем оценку
+    IF total_params > 0 AND matched_params = 0 THEN
+        RETURN 0.2;  
+    ELSIF matched_params > 0 AND matched_params < total_params THEN
+        RETURN 0.5; 
+    ELSIF matched_params = total_params THEN
+        RETURN 1.0; 
+    ELSE
+        RETURN 1.0;  -- Нет параметров для проверки (все NULL или не указаны)
     END IF;
-    
-    -- Если ни один параметр не указан - считаем за успех
-    IF total_params = 0 THEN
-        RETURN 1.0;
-    END IF;
-    
-    RETURN score;
 END;
 $$ LANGUAGE plpgsql;
 
 
 CREATE OR REPLACE FUNCTION check_trigger(
     student_schema TEXT,
-	teacher_schema TEXT,
+    teacher_schema TEXT,
     expected_trigger_sql TEXT
 ) RETURNS NUMERIC AS $$
 DECLARE
@@ -758,19 +705,15 @@ BEGIN
     trigger_name := (regexp_matches(expected_trigger_sql, 'CREATE TRIGGER\s+([^\s(]+)', 'i'))[1];
     table_name := (regexp_matches(expected_trigger_sql, 'ON\s+([^\s(;]+)', 'i'))[1];
     function_name := (regexp_matches(expected_trigger_sql, 'EXECUTE FUNCTION\s+([^\s(]+)', 'i'))[1];
-
-    -- Удаляем старый эталонный триггер
+    -- Создаем эталонный триггер
     BEGIN
         EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I.%I', 
                       trigger_name, teacher_schema, table_name);
     EXCEPTION WHEN OTHERS THEN
-        -- Игнорируем ошибки, если таблицы/триггера не существует
     END;
     
-    -- Создаем временную таблицу и функцию для триггера
     BEGIN
         EXECUTE format('SET search_path TO %I', teacher_schema);
-		-- Создаем эталонный триггер
         EXECUTE expected_trigger_sql;
         
         EXECUTE format('SET search_path TO public');
@@ -811,25 +754,20 @@ BEGIN
         RETURN 0.0;
     END IF;
     
-    -- Сравниваем основные параметры триггеров из системных таблиц
-    -- Используем только существующие столбцы в pg_trigger
+    -- Сравниваем tgtype триггеров из системных таблиц
     EXECUTE format('
         SELECT COUNT(*) FROM (
-            SELECT 
-                tgname, tgtype, tgisinternal, tgdeferrable, 
-                tginitdeferred, tgenabled, tgconstraint
+            SELECT tgtype
             FROM pg_trigger
             WHERE oid = %L
             EXCEPT
-            SELECT 
-                tgname, tgtype, tgisinternal, tgdeferrable, 
-                tginitdeferred, tgenabled, tgconstraint
+            SELECT tgtype
             FROM pg_trigger
             WHERE oid = %L
         ) AS diff', 
         teacher_trigger_oid, student_trigger_oid)
     INTO match_count;
-    -- Возвращаем результат
+    
     IF match_count = 0 THEN
         RETURN 1.0;
     ELSE
@@ -837,7 +775,6 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION check_index(
     student_schema TEXT,
@@ -854,16 +791,11 @@ BEGIN
     -- Извлекаем имя индекса и таблицы из запроса
     index_name := (regexp_matches(create_index_sql, 'CREATE(?: UNIQUE)? INDEX\s+([^\s(]+)', 'i'))[1];
     table_name := (regexp_matches(create_index_sql, 'ON\s+([^\s(;]+)', 'i'))[1];
-    
+    -- Создаем эталонный индекс
     BEGIN
         EXECUTE format('SET search_path TO %I', teacher_schema);
-        
-        -- Пытаемся создать индекс (может вызвать ошибку если уже существует)
-        BEGIN
-            EXECUTE create_index_sql;
-        EXCEPTION WHEN duplicate_table THEN
-            -- Индекс уже существует - это нормально
-        END;
+        EXECUTE format('DROP INDEX IF EXISTS %I', index_name);
+        EXECUTE create_index_sql;
         
         EXECUTE format('SET search_path TO public');
     EXCEPTION WHEN OTHERS THEN
@@ -906,7 +838,7 @@ BEGIN
         RETURN 0.0;
     END IF;
     
-    -- Сравниваем только таблицу и колонки (indkey)
+    -- Сравниваем колонки
     EXECUTE format('
         SELECT COUNT(*) FROM (
             SELECT i.indkey
@@ -920,7 +852,7 @@ BEGIN
         teacher_index_oid, student_index_oid)
     INTO match_count;
     
-    -- Возвращаем результат (не удаляем индекс)
+    -- Возвращаем результат
     RETURN CASE WHEN match_count = 0 THEN 1.0 ELSE 0.0 END;
 END;
 $$ LANGUAGE plpgsql;
