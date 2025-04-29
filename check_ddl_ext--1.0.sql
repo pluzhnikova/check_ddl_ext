@@ -95,7 +95,7 @@ BEGIN
         RETURN round(total_score, 1);
     END IF;
 
-    -- Проверяем только требуемые столбцы (игнорируем лишние столбцы у студента)
+    -- Проверяем только требуемые столбцы
     IF teacher_table_oid IS NOT NULL AND student_table_oid IS NOT NULL THEN
         EXECUTE format('
             SELECT COUNT(*) 
@@ -128,7 +128,6 @@ BEGIN
         INTO correct_columns;
     END IF;
 
-    -- Добавляем баллы за правильные столбцы
     IF column_count > 0 THEN
         total_score := total_score + (0.6 * (correct_columns::NUMERIC / column_count));
     END IF;
@@ -136,6 +135,7 @@ BEGIN
     RETURN round(total_score, 1);
 END;
 $$ LANGUAGE plpgsql;
+
 
 CREATE OR REPLACE FUNCTION check_view(
     student_schema TEXT,
@@ -156,10 +156,9 @@ BEGIN
     -- Извлекаем имя представления из SQL-запроса
     view_name := (regexp_matches(expected_view_sql, 'CREATE VIEW\s+([^\s(]+)', 'i'))[1];
        
-    -- Удаляем старое эталонное представление 
+    -- Создаем эталонное представление
     EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
     
-    -- Создаем эталонное представление
     BEGIN
         EXECUTE format('SET search_path TO %I', teacher_schema);
         EXECUTE expected_view_sql;
@@ -195,7 +194,7 @@ BEGIN
         RETURN 0.0;
     END IF;
 
-    -- Получаем список обязательных столбцов из эталонного представления
+    -- Проверяем наличие всех обязательных столбцов у студента
     EXECUTE format('
         SELECT array_agg(a.attname)
         FROM pg_attribute a
@@ -205,7 +204,6 @@ BEGIN
         teacher_view_oid)
     INTO required_columns;
     
-    -- Проверяем наличие всех обязательных столбцов у студента
     FOREACH missing_column IN ARRAY required_columns LOOP
         EXECUTE format('
             SELECT NOT EXISTS (
@@ -259,7 +257,7 @@ BEGIN
         RETURN 0.3;
     END IF;
     
-    -- Проверка данных (только по обязательным столбцам)
+    -- Проверка данных по обязательным столбцам
     BEGIN
         EXECUTE format('
             SELECT jsonb_agg(row_to_json(t))
@@ -284,6 +282,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+
 CREATE OR REPLACE FUNCTION check_materialized_view(
     student_schema TEXT,
     teacher_schema TEXT,
@@ -300,13 +299,12 @@ DECLARE
     column_exists BOOLEAN;
     type_mismatch BOOLEAN;
 BEGIN
-    -- Извлекаем имя представления из SQL-запроса
+    -- Извлекаем имя представления 
     view_name := (regexp_matches(expected_view_sql, 'CREATE MATERIALIZED VIEW\s+([^\s(]+)', 'i'))[1];
     
-    -- Удаляем старое эталонное представление 
+    -- Создаем эталонное представление
     EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE', teacher_schema, view_name);
     
-    -- Создаем эталонное представление
     BEGIN
         EXECUTE format('SET search_path TO %I', teacher_schema);
         EXECUTE expected_view_sql;
@@ -342,7 +340,7 @@ BEGIN
         RETURN 0.0;
     END IF;
 
-    -- Получаем список обязательных столбцов из эталонного представления
+    -- Проверяем наличие всех обязательных столбцов 
     EXECUTE format('
         SELECT array_agg(a.attname)
         FROM pg_attribute a
@@ -352,7 +350,6 @@ BEGIN
         teacher_view_oid)
     INTO required_columns;
     
-    -- Проверяем наличие всех обязательных столбцов у студента
     FOREACH missing_column IN ARRAY required_columns LOOP
         EXECUTE format('
             SELECT NOT EXISTS (
@@ -406,7 +403,7 @@ BEGIN
         RETURN 0.3;
     END IF;
     
-    -- Проверка данных (только по обязательным столбцам)
+    -- Проверка данных по обязательным столбцам
     BEGIN
         EXECUTE format('
             SELECT jsonb_agg(row_to_json(t))
@@ -430,6 +427,7 @@ BEGIN
     RETURN 1.0;
 END;
 $$ LANGUAGE plpgsql;
+
 
 CREATE OR REPLACE FUNCTION check_constraints(
     student_schema TEXT,
@@ -562,6 +560,8 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+
 CREATE OR REPLACE FUNCTION check_sequence(
     student_schema TEXT,
     teacher_schema TEXT,
@@ -775,6 +775,7 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
 
 CREATE OR REPLACE FUNCTION check_index(
     student_schema TEXT,
